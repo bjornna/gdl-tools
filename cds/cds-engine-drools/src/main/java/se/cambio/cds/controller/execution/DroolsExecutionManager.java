@@ -4,10 +4,12 @@
 package se.cambio.cds.controller.execution;
 
 import org.apache.log4j.Logger;
-import org.drools.KnowledgeBase;
-import org.drools.KnowledgeBaseFactory;
-import org.drools.definition.KnowledgePackage;
-import org.drools.runtime.StatelessKnowledgeSession;
+
+import org.kie.api.KieBase;
+import org.kie.api.runtime.StatelessKieSession;
+import org.kie.internal.KnowledgeBaseFactory;
+import org.kie.internal.definition.KnowledgePackage;
+import org.kie.internal.runtime.StatelessKnowledgeSession;
 import org.openehr.rm.datatypes.quantity.datetime.DvDateTime;
 import se.cambio.cds.model.instance.ElementInstance;
 import se.cambio.cds.util.ExecutionLogger;
@@ -24,7 +26,7 @@ import java.util.*;
 
 public class DroolsExecutionManager {
 
-    public Map<String, KnowledgeBase> _knowledgeBaseCache = null;
+    public Map<String, KieBase> _knowledgeBaseCache = null;
     private static DroolsExecutionManager _instance = null;
     private static final short MAX_KNOWLEDGE_BASE_CACHE = 10;
     private boolean _useCache = true;
@@ -32,7 +34,7 @@ public class DroolsExecutionManager {
     private Long _timeOutInMillis = null;
 
     private DroolsExecutionManager(){
-        _knowledgeBaseCache = Collections.synchronizedMap(new LinkedHashMap <String, KnowledgeBase>());
+        _knowledgeBaseCache = Collections.synchronizedMap(new LinkedHashMap <String, KieBase>());
     }
 
     public static void executeGuides(
@@ -41,7 +43,7 @@ public class DroolsExecutionManager {
             Collection<Object> workingMemoryObjects,
             ExecutionLogger executionLogger)
             throws InternalErrorException{
-        KnowledgeBase kb = null;
+        KieBase kb = null;
         if (getDelegate()._useCache){
             kb =  getKnowledgeBase(guideDTOs);
         }else{
@@ -57,13 +59,13 @@ public class DroolsExecutionManager {
 
     private static void executeGuides(
             Collection<String> guideIds,
-            KnowledgeBase knowledgeBase,
+            KieBase knowledgeBase,
             Calendar date,
             Collection<Object> workingMemoryObjects,
             ExecutionLogger executionLogger)
             throws InternalErrorException{
         try{
-            final StatelessKnowledgeSession session = knowledgeBase.newStatelessKnowledgeSession();
+            final StatelessKieSession session = knowledgeBase.newStatelessKieSession();
 
             final RuleExecutionWMLogger ruleExecutionWMLogger = new RuleExecutionWMLogger();
             session.addEventListener(ruleExecutionWMLogger);
@@ -97,13 +99,13 @@ public class DroolsExecutionManager {
     }
 
 
-    private static KnowledgeBase getKnowledgeBase(Collection<GuideDTO> guideDTOs)
+    private static KieBase getKnowledgeBase(Collection<GuideDTO> guideDTOs)
             throws InternalErrorException{
         if (guideDTOs==null || guideDTOs.isEmpty()){
             return null;
         }
         String guideIdsId = getGuideIdsId(guideDTOs);
-        KnowledgeBase kb = getDelegate()._knowledgeBaseCache.get(guideIdsId);
+        KieBase kb = getDelegate()._knowledgeBaseCache.get(guideIdsId);
         if (kb==null){
             kb = DroolsExecutionManager.generateKnowledgeBase(guideDTOs);
             getDelegate()._knowledgeBaseCache.put(guideIdsId, kb);
@@ -141,7 +143,7 @@ public class DroolsExecutionManager {
         return guideIdsIdSB.toString();
     }
 
-    private static KnowledgeBase generateKnowledgeBase(Collection<GuideDTO> guideDTOs) {
+    private static KieBase generateKnowledgeBase(Collection<GuideDTO> guideDTOs) {
         ArrayList<KnowledgePackage> knowledgePackages = new ArrayList<KnowledgePackage>();
         for (GuideDTO guideDTO : guideDTOs) {
             if (guideDTO.getCompiledGuide()==null){
@@ -153,9 +155,10 @@ public class DroolsExecutionManager {
                 knowledgePackages.add(knowledgePackage);
             }
         }
-        final KnowledgeBase knowledgeBase = KnowledgeBaseFactory.newKnowledgeBase();
+        final KieBase knowledgeBase = KnowledgeBaseFactory.newKnowledgeBase();
         if (!knowledgePackages.isEmpty()){
-            knowledgeBase.addKnowledgePackages(knowledgePackages);
+            knowledgeBase.getKiePackages().addAll(knowledgePackages);
+            //knowledgeBase.addKnowledgePackages(knowledgePackages);
         }
         return knowledgeBase;
     }

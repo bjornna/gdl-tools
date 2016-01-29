@@ -1,23 +1,37 @@
 package se.cambio.cds.gdl.converters.drools;
 
 
-import org.drools.KnowledgeBase;
-import org.drools.KnowledgeBaseFactory;
-import org.drools.RuntimeDroolsException;
-import org.drools.builder.*;
-import org.drools.definition.KnowledgePackage;
-import org.drools.io.Resource;
-import org.drools.io.ResourceFactory;
+
+
+
+import org.apache.commons.logging.Log;
+import org.apache.log4j.Logger;
+import org.drools.core.util.DroolsStreamUtils;
+import org.kie.api.KieBase;
+import org.kie.api.definition.KiePackage;
+import org.kie.api.io.Resource;
+import org.kie.api.io.ResourceType;
+import org.kie.internal.KnowledgeBase;
+import org.kie.internal.KnowledgeBaseFactory;
+import org.kie.internal.builder.KnowledgeBuilder;
+import org.kie.internal.builder.KnowledgeBuilderConfiguration;
+import org.kie.internal.builder.KnowledgeBuilderErrors;
+import org.kie.internal.builder.KnowledgeBuilderFactory;
+import org.kie.internal.definition.KnowledgePackage;
+import org.kie.internal.io.ResourceFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class CompilationManager {
-
+private static Logger log = Logger.getLogger(CompilationManager.class);
     public static byte[] compile(String guideStr) throws CompilationErrorException {
+        log.info("compile:" + guideStr);
         Resource guide = ResourceFactory.newByteArrayResource(guideStr.getBytes());
         return compile(guide);
     }
@@ -26,37 +40,48 @@ public class CompilationManager {
         try {
             Collection<Resource> guides = new ArrayList<Resource>();
             guides.add(guide);
-            KnowledgeBase kb = getKnowledgeBase(guides);
-            KnowledgePackage kpakage = kb.getKnowledgePackages().iterator().next();
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ObjectOutputStream objOut = new ObjectOutputStream(baos);
-            objOut.writeObject(kpakage);
-            objOut.flush();
-            return baos.toByteArray();
-        } catch (RuntimeDroolsException e) {
-            throw new CompilationErrorException(e);
+            KieBase kb = getKnowledgeBase(guides);
+            if(kb.getKiePackages().iterator().hasNext()) {
+                KiePackage kpakage = kb.getKiePackages().iterator().next();
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ObjectOutputStream objOut = new ObjectOutputStream(baos);
+                objOut.writeObject(kpakage);
+                objOut.flush();
+                return baos.toByteArray();
+            }else{
+                throw new CompilationErrorException("There where no KIE packages to build from");
+            }
         } catch (IOException e) {
+            throw new CompilationErrorException(e);
+        }catch (NoSuchElementException e){
             throw new CompilationErrorException(e);
         }
     }
 
-    public static KnowledgeBase getKnowledgeBase(Collection<Resource> guides)
+    public static KieBase getKnowledgeBase(Collection<Resource> guides)
             throws CompilationErrorException{
         return getKnowledgeBase(guides, null);
     }
 
-    public static KnowledgeBase getKnowledgeBase(Collection<Resource> guides, KnowledgeBuilderConfiguration kbc)
+    public static KieBase getKnowledgeBase(Collection<Resource> guides, KnowledgeBuilderConfiguration kbc)
             throws CompilationErrorException{
+       final KnowledgeBase kbase = KnowledgeBaseFactory.newKnowledgeBase();
+
         final KnowledgeBuilder kbuilder = KnowledgeBuilderFactory.newKnowledgeBuilder(kbc);
         for (Resource guia : guides) {
             kbuilder.add(guia, ResourceType.DRL);
+
+
+
         }
-        KnowledgeBase kbase = KnowledgeBaseFactory.newKnowledgeBase();
-        kbase.addKnowledgePackages( kbuilder.getKnowledgePackages() );
+Collection<KnowledgePackage> packages = kbuilder.getKnowledgePackages();
+        kbase.addKnowledgePackages(packages);
+
         KnowledgeBuilderErrors packErrors = kbuilder.getErrors();
         if (packErrors.size()>0){
             throw new CompilationErrorException(packErrors.iterator().next().getMessage());
         }
+
         return kbase;
     }
 }

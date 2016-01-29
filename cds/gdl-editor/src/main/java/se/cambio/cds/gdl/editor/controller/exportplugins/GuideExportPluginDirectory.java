@@ -28,7 +28,9 @@ public class GuideExportPluginDirectory {
         Logger.getLogger(GuideExportPluginDirectory.class).info("Compiling ...");
         Collection<GuideExportPlugin> guideExportPlugins = getGuideExportPlugins();
         if(guideExportPlugins.iterator().hasNext()){
-            return guideExportPlugins.iterator().next().compile(guide);
+            GuideExportPlugin n = guideExportPlugins.iterator().next();
+            return n.compile(guide);
+            //return guideExportPlugins.iterator().next().compile(guide);
         }else{
             return null;
         }
